@@ -34,6 +34,7 @@ uint16_t glitchGlitchRandomMax[] = {(uint16_t)11000, (uint16_t)400000};
 
 //DMX Channel parameter
 uint8_t dmxChannelStart = 1;
+uint8_t dmxDefaultLight = 5;
 
 void e131task(void *pvParameters) {
 	printf("Open server.\r\n");
@@ -194,6 +195,9 @@ void user_init(void) {
 
 	memset(pbuff.raw, 0, sizeof(pbuff.raw));
 	pwbuff = &pbuff;
+	for (uint8_t id = 0; id < sizeof(pins); id++) {
+		pwbuff->property_values[id + dmxChannelStart] = dmxDefaultLight; //Set default light level
+	}
 	xTaskCreate(e131task, "e131task", 768, NULL, 8, NULL);
 	xTaskCreate(pwmtask, "pwmtask", 256, NULL, 2, NULL);
 	xTaskCreate(glitchtask, "glitchtask", 256, NULL, 2, NULL);
