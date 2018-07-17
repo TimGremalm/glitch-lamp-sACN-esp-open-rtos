@@ -28,13 +28,23 @@ uint8_t pinDutyOut[] = {0, 0};
 
 //Glitch state machine parameters
 uint32_t glitchNextGlitch[] = {(uint32_t)0, (uint32_t)0};
-uint8_t glitchGlitchEnabled[] = {1, 0};
+uint8_t glitchGlitchEnabled[] = {1, 1};
 uint16_t glitchGlitchRandomMin[] = {(uint16_t)10000, (uint16_t)222000};
 uint16_t glitchGlitchRandomMax[] = {(uint16_t)11000, (uint16_t)400000};
 
 //DMX Channel parameter
-uint8_t dmxChannelStart = 1;
-uint8_t dmxDefaultLight = 5;
+uint16_t dmxChannelStart = 1;
+uint8_t dmxDefaultLightLevel = 5;
+uint8_t dmxDefaultGlitchTiming = 2; //4 * 2 = 8 seconds
+
+typedef enum {
+  DMX_LEVEL = 0,
+  DMX_GLITCH = 1
+} dmx_sub_adress_t;
+
+uint16_t getDMXChannel(uint8_t id, dmx_sub_adress_t sub) {
+	return dmxChannelStart + (id*2) + sub;
+}
 
 void e131task(void *pvParameters) {
 	printf("Open server.\r\n");
@@ -120,6 +130,22 @@ uint16_t randomRange(uint16_t minimum_number, uint16_t max_number) {
 	return rand() % (max_number + 1 - minimum_number) + minimum_number;
 }
 
+void calculateMinMaxTiming(uint8_t id) {
+	//Get DMX glitch channel value
+	uint16_t msTime = pwbuff->property_values[getDMXChannel(id, DMX_GLITCH)];
+	//Convert it to milliseconds and multiply to get a arbitrary higher value
+	msTime = msTime * 1000 * 4;
+	uint16_t percentage = (uint16_t)(0.2 * msTime);
+	//If glitch is set to zero, disable glitching, else set min max time
+	if(msTime == 0) {
+		glitchGlitchEnabled[id] = 0;
+	} else {
+		glitchGlitchEnabled[id] = 1;
+		glitchGlitchRandomMin[id] = msTime - percentage;
+		glitchGlitchRandomMax[id] = msTime + percentage;
+	}
+}
+
 void calculateNextGlitch(uint8_t id) {
 	uint32_t time = sys_now();
 	bool makeShortGlitch = false;
@@ -134,6 +160,7 @@ void calculateNextGlitch(uint8_t id) {
 			makeShortGlitch = true;
 		}
 	}
+	calculateMinMaxTiming(id);
 	uint16_t randomDelay = 0;
 	if (makeShortGlitch) {
 		randomDelay = randomRange(60, 300);
@@ -141,22 +168,29 @@ void calculateNextGlitch(uint8_t id) {
 		randomDelay = randomRange(glitchGlitchRandomMin[id], glitchGlitchRandomMax[id]);
 	}
 	glitchNextGlitch[id] = time + randomDelay;
-	printf("Next delay in: %dms\n", randomDelay);
+	//Only print if glitch is enabled
+	if (glitchGlitchEnabled[id] == 1) {
+		printf("Next delay in: %dms\n", randomDelay);
+	}
 }
 
 void glitch(uint8_t id) {
 	//Toggle level for a glitch effect
 	if(pinDutyOut[id] == 0) {
-		pinDutyOut[id] = pwbuff->property_values[id + dmxChannelStart]; //Get DMX channel value from sACN struct
+		pinDutyOut[id] = pwbuff->property_values[getDMXChannel(id, DMX_LEVEL)]; //Get DMX channel value from sACN struct
 	} else {
-		pinDutyOut[id] = 0;
+		//Only turn off if glitch is enabled
+		if (glitchGlitchEnabled[id] == 1) {
+			pinDutyOut[id] = 0;
+		}
 	}
 }
 
 void checkLevelAgainstDMX(uint8_t id) {
 	//Only update level if it's not in an off-state
 	if(pinDutyOut[id] != 0) {
-		pinDutyOut[id] = pwbuff->property_values[id + dmxChannelStart]; //Get DMX channel value from sACN struct
+		//Get DMX channel value from sACN struct
+		pinDutyOut[id] = pwbuff->property_values[getDMXChannel(id, DMX_LEVEL)];
 	}
 }
 
@@ -169,14 +203,11 @@ void glitchtask(void *pvParameters) {
 	while(1) {
 		uint32_t time = sys_now();
 		for (uint8_t i = 0; i < sizeof(pins); i++) {
-			if (glitchGlitchEnabled[i] == 1) {
-				if (time >= glitchNextGlitch[i]) {
-					printf("Glitch %d\n", i);
-					glitch(i);
-					calculateNextGlitch(i);
-				}
-				checkLevelAgainstDMX(i);
+			if (time >= glitchNextGlitch[i]) {
+				glitch(i);
+				calculateNextGlitch(i);
 			}
+			checkLevelAgainstDMX(i);
 		}
 		vTaskDelay(1);
 	}
@@ -196,7 +227,11 @@ void user_init(void) {
 	memset(pbuff.raw, 0, sizeof(pbuff.raw));
 	pwbuff = &pbuff;
 	for (uint8_t id = 0; id < sizeof(pins); id++) {
-		pwbuff->property_values[id + dmxChannelStart] = dmxDefaultLight; //Set default light level
+		//Set default light level
+		pwbuff->property_values[getDMXChannel(id, DMX_LEVEL)] = dmxDefaultLightLevel;
+
+		//Set default glitch timings
+		pwbuff->property_values[getDMXChannel(id, DMX_GLITCH)] = dmxDefaultGlitchTiming;
 	}
 	xTaskCreate(e131task, "e131task", 768, NULL, 8, NULL);
 	xTaskCreate(pwmtask, "pwmtask", 256, NULL, 2, NULL);
