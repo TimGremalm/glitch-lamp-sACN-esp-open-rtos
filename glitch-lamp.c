@@ -79,10 +79,10 @@ void e131task(void *pvParameters) {
 void pwmtask(void *pvParameters)
 {
 	//Set up PWM for pins
-	uint8_t    pins[] = {14, 12, 13, 15, 3}; //NodeMCU D5-D9 https://github.com/nodemcu/nodemcu-devkit-v1.0#pin-map
+	uint8_t    pins[] = {2}; //NodeMCU D4 https://github.com/nodemcu/nodemcu-devkit-v1.0#pin-map
 	pwm_info_t pwm_info;
 	pwm_info.channels = sizeof(pins);
-	pwm_info.reverse = true;
+	pwm_info.reverse = false;
 	multipwm_init(&pwm_info);
 	for (uint8_t ii=0; ii<pwm_info.channels; ii++) {
 		multipwm_set_pin(&pwm_info, ii, pins[ii]);
@@ -93,7 +93,7 @@ void pwmtask(void *pvParameters)
 
 		uint16_t channel[pwm_info.channels];
 		for (uint8_t i=0; i<pwm_info.channels; i++) {
-			channel[i] = pwbuff->property_values[i+1]; //Get DMX channel value from sACN struct
+			channel[i] = pwbuff->property_values[i+5]; //Get DMX channel value from sACN struct
 			//Upscale 8 bit DMX value to 16 bit, and add original value to fit the range from 0-65535
 			channel[i] = (channel[i] << 8) + channel[i];
 			multipwm_set_duty(&pwm_info, i, channel[i]);
