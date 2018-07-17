@@ -23,17 +23,17 @@ e131_packet_t pbuff; /* Packet buffer */
 e131_packet_t *pwbuff; /* Pointer to working packet buffer */
 
 //Set up PWM for pins
-uint8_t pins[] = {2, 4}; //NodeMCU D4, D2 https://github.com/nodemcu/nodemcu-devkit-v1.0#pin-map
-uint8_t pinDutyOut[] = {0, 0};
+uint8_t pins[] = {2}; //NodeMCU D4, D2 https://github.com/nodemcu/nodemcu-devkit-v1.0#pin-map
+uint8_t pinDutyOut[] = {0};
 
 //Glitch state machine parameters
-uint32_t glitchNextGlitch[] = {(uint32_t)0, (uint32_t)0};
-uint8_t glitchGlitchEnabled[] = {1, 1};
-uint16_t glitchGlitchRandomMin[] = {(uint16_t)10000, (uint16_t)222000};
-uint16_t glitchGlitchRandomMax[] = {(uint16_t)11000, (uint16_t)400000};
+uint32_t glitchNextGlitch[] = {(uint32_t)0};
+uint8_t glitchGlitchEnabled[] = {1};
+uint16_t glitchGlitchRandomMin[] = {(uint16_t)10000};
+uint16_t glitchGlitchRandomMax[] = {(uint16_t)11000};
 
 //DMX Channel parameter
-uint16_t dmxChannelStart = 1;
+uint16_t dmxChannelStart = 9;
 uint8_t dmxDefaultLightLevel = 5;
 uint8_t dmxDefaultGlitchTiming = 2; //4 * 2 = 8 seconds
 
