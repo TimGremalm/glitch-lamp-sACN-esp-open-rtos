@@ -22,24 +22,24 @@
 e131_packet_t pbuff; /* Packet buffer */
 e131_packet_t *pwbuff; /* Pointer to working packet buffer */
 
+//DMX Channel parameter
+uint16_t dmxChannelStart = 1;
+uint8_t dmxDefaultLightLevel = 5;
+uint8_t dmxDefaultGlitchTiming = 2; //4 * 2 = 8 seconds
+
 //Set up PWM for pins
 uint8_t pins[] = {2}; //NodeMCU D4, D2 https://github.com/nodemcu/nodemcu-devkit-v1.0#pin-map
 uint8_t pinDutyOut[] = {0};
 
 //Glitch state machine parameters
-uint32_t glitchNextGlitch[] = {(uint32_t)0};
-uint8_t glitchGlitchEnabled[] = {1};
-uint16_t glitchGlitchRandomMin[] = {(uint16_t)10000};
-uint16_t glitchGlitchRandomMax[] = {(uint16_t)11000};
-
-//DMX Channel parameter
-uint16_t dmxChannelStart = 9;
-uint8_t dmxDefaultLightLevel = 5;
-uint8_t dmxDefaultGlitchTiming = 2; //4 * 2 = 8 seconds
+uint32_t glitchNextGlitch[] = {(uint32_t)4000};
+uint8_t glitchGlitchEnabled[] = {2};
+uint32_t glitchGlitchRandomMin[] = {(uint16_t)0};
+uint32_t glitchGlitchRandomMax[] = {(uint16_t)0};
 
 typedef enum {
-  DMX_LEVEL = 0,
-  DMX_GLITCH = 1
+	DMX_LEVEL = 0,
+	DMX_GLITCH = 1
 } dmx_sub_adress_t;
 
 uint16_t getDMXChannel(uint8_t id, dmx_sub_adress_t sub) {
@@ -132,15 +132,13 @@ uint16_t randomRange(uint16_t minimum_number, uint16_t max_number) {
 
 void calculateMinMaxTiming(uint8_t id) {
 	//Get DMX glitch channel value
-	uint16_t msTime = pwbuff->property_values[getDMXChannel(id, DMX_GLITCH)];
+	glitchGlitchEnabled[id] = pwbuff->property_values[getDMXChannel(id, DMX_GLITCH)];
+	uint32_t msTime = glitchGlitchEnabled[id];
 	//Convert it to milliseconds and multiply to get a arbitrary higher value
 	msTime = msTime * 1000 * 4;
 	uint16_t percentage = (uint16_t)(0.2 * msTime);
 	//If glitch is set to zero, disable glitching, else set min max time
-	if(msTime == 0) {
-		glitchGlitchEnabled[id] = 0;
-	} else {
-		glitchGlitchEnabled[id] = 1;
+	if(glitchGlitchEnabled[id] != 0) {
 		glitchGlitchRandomMin[id] = msTime - percentage;
 		glitchGlitchRandomMax[id] = msTime + percentage;
 	}
@@ -169,7 +167,7 @@ void calculateNextGlitch(uint8_t id) {
 	}
 	glitchNextGlitch[id] = time + randomDelay;
 	//Only print if glitch is enabled
-	if (glitchGlitchEnabled[id] == 1) {
+	if (glitchGlitchEnabled[id] != 0) {
 		printf("Next delay in: %dms\n", randomDelay);
 	}
 }
@@ -180,7 +178,7 @@ void glitch(uint8_t id) {
 		pinDutyOut[id] = pwbuff->property_values[getDMXChannel(id, DMX_LEVEL)]; //Get DMX channel value from sACN struct
 	} else {
 		//Only turn off if glitch is enabled
-		if (glitchGlitchEnabled[id] == 1) {
+		if (glitchGlitchEnabled[id] != 0) {
 			pinDutyOut[id] = 0;
 		}
 	}
@@ -191,6 +189,12 @@ void checkLevelAgainstDMX(uint8_t id) {
 	if(pinDutyOut[id] != 0) {
 		//Get DMX channel value from sACN struct
 		pinDutyOut[id] = pwbuff->property_values[getDMXChannel(id, DMX_LEVEL)];
+	}
+	//If glitch is updated, set it
+	if (glitchGlitchEnabled[id] != pwbuff->property_values[getDMXChannel(id, DMX_GLITCH)]) {
+		glitchGlitchEnabled[id] = pwbuff->property_values[getDMXChannel(id, DMX_GLITCH)];
+		printf("New glitch %d\n", glitchGlitchEnabled[id]);
+		calculateNextGlitch(id);
 	}
 }
 
@@ -229,8 +233,10 @@ void user_init(void) {
 	for (uint8_t id = 0; id < sizeof(pins); id++) {
 		//Set default light level
 		pwbuff->property_values[getDMXChannel(id, DMX_LEVEL)] = dmxDefaultLightLevel;
+		pinDutyOut[id] = 0;
 
 		//Set default glitch timings
+		glitchGlitchEnabled[id] = dmxDefaultGlitchTiming;
 		pwbuff->property_values[getDMXChannel(id, DMX_GLITCH)] = dmxDefaultGlitchTiming;
 	}
 	xTaskCreate(e131task, "e131task", 768, NULL, 8, NULL);
