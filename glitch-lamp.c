@@ -24,8 +24,8 @@ e131_packet_t *pwbuff; /* Pointer to working packet buffer */
 
 //DMX Channel parameter
 uint16_t dmxChannelStart = 1;
-uint8_t dmxDefaultLightLevel = 5;
-uint8_t dmxDefaultGlitchTiming = 2; //4 * 2 = 8 seconds
+uint8_t dmxDefaultLightLevel = 10;
+uint8_t dmxDefaultGlitchTiming = 150; //4 * 150 = 600 seconds
 
 //Set up PWM for pins
 uint8_t pins[] = {2}; //NodeMCU D4, D2 https://github.com/nodemcu/nodemcu-devkit-v1.0#pin-map
