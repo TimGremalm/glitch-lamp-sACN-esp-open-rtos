@@ -76,7 +76,7 @@ void e131task(void *pvParameters) {
 		return;
 	}
 
-	printf("Listening for connections.\r\n");
+	printf("Listening on multicast 239.255.0.1 port 5568. DMX channel %d\n", dmxChannelStart);
 
 	while(1) {
 		struct netbuf *buf;
@@ -92,6 +92,7 @@ void e131task(void *pvParameters) {
 			if(netbuf_copy(buf, pwbuff->raw, sizeof(pwbuff->raw)) != buf->p->tot_len) {
 				printf("Error: Couldn't copy buffer. err=%d\r\n", err);
 			}
+			//printf("Got packet\n");
 		} else {
 			printf("Wrong packet size.\n\n");
 		}
@@ -193,7 +194,7 @@ void checkLevelAgainstDMX(uint8_t id) {
 	//If glitch is updated, set it
 	if (glitchGlitchEnabled[id] != pwbuff->property_values[getDMXChannel(id, DMX_GLITCH)]) {
 		glitchGlitchEnabled[id] = pwbuff->property_values[getDMXChannel(id, DMX_GLITCH)];
-		printf("New glitch %d\n", glitchGlitchEnabled[id]);
+		printf("New glitch: %d level: %d\n", glitchGlitchEnabled[id], pinDutyOut[id]);
 		calculateNextGlitch(id);
 	}
 }
